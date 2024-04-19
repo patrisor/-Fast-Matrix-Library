@@ -135,10 +135,10 @@ public:
             "Incompatible dimensions for multiplication."
         );
         // Determine the number of rows and columns for the resulting matrix
-        int blockSize = 128;
         Matrix<T> result(rows, other.cols);
-        std::vector<std::thread> threads;
         // Launch threads for each block of the resulting matrix
+        int blockSize = 128;
+        std::vector<std::thread> threads;
         for (int i = 0; i < rows; i += blockSize) {
             for (int j = 0; j < other.cols; j += blockSize) {
                 threads.emplace_back(
@@ -162,11 +162,10 @@ public:
      * @return A new matrix that is the transpose of this matrix.
      */
     Matrix<T> transpose() const {
-        // Determine the number of rows and columns for the resulting matrix
-        int blockSize = 256;
         Matrix<T> result(cols, rows);
-        std::vector<std::thread> threads;
         // Loop over the matrix in blocks
+        int blockSize = 256;
+        std::vector<std::thread> threads;
         for (int i = 0; i < rows; i += blockSize) {
             for (int j = 0; j < cols; j += blockSize) {
                 // Launch a new thread for each block

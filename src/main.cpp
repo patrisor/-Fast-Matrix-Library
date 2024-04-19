@@ -140,7 +140,7 @@ void testMatrixTransposition() {
 
 void testMatrixPerformance() {
     std::cout << "Testing Matrix Performance..." << std::endl;
-    const int size = 1000;
+    const int size = 10000;
     Matrix<int> largeMatrix(size, size);
     // Testing Multiplication Performance
     auto startMultiplication = std::chrono::high_resolution_clock::now();
