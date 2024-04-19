@@ -1,4 +1,4 @@
-# Matrix Library Project
+# Fast Matrix Library
 
 ## Overview
 This project implements basic matrix operations like multiplication and transposition without using external libraries.
