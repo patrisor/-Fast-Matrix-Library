@@ -20,7 +20,8 @@
 template<typename T>
 class Matrix {
 private:
-    std::vector<std::vector<T>> data; // 2D vector to store matrix data
+    int rows, cols;
+    std::vector<T> data;
 
 public:
     /* ********************************************************************* */
@@ -33,17 +34,27 @@ public:
      * @param rows Number of rows in the matrix.
      * @param cols Number of columns in the matrix.
      */
-    Matrix(int rows, int cols) : data(rows, std::vector<T>(cols, 0)) {}
+    Matrix(int rows, int cols) : 
+        rows(rows), cols(cols), data(rows * cols, 0) {}
 
     /**
      * Constructs a matrix from a nested initializer list.
      * 
      * @param init A nested initializer list representing a matrix.
      */
-    Matrix(std::initializer_list<std::initializer_list<T>> init) {
-        data.reserve(init.size());
+    Matrix(std::initializer_list<std::initializer_list<T>> init) : 
+        rows(static_cast<int>(init.size())), 
+        cols(init.begin() != init.end() 
+            ? static_cast<int>(init.begin()->size()) : 0),
+        data(rows * cols) {
+        auto it = data.begin();
         for (const auto& row : init) {
-            data.push_back(std::vector<T>(row.begin(), row.end()));
+            if (row.size() != static_cast<size_t>(cols)) {
+                throw std::invalid_argument(
+                    "All rows must have the same number of columns."
+                );
+            }
+            it = std::copy(row.begin(), row.end(), it);
         }
     }
 
@@ -60,7 +71,7 @@ public:
      * @return Reference to the matrix element.
      */
     T& operator()(int row, int col) {
-        return data[row][col];
+        return data[row * cols + col];
     }
 
     /**
@@ -72,7 +83,7 @@ public:
      * @return Const reference to the matrix element.
      */
     const T& operator()(int row, int col) const {
-        return data[row][col];
+        return data[row * cols + col];
     }
 
     /**
@@ -81,7 +92,7 @@ public:
      * @return Integer count of rows.
      */
     int getRows() const { 
-        return data.size(); 
+        return rows; 
     }
 
     /**
@@ -90,7 +101,7 @@ public:
      * @return Integer count of columns.
      */
     int getCols() const { 
-        return data[0].size(); 
+        return cols; 
     }
 
     /* ********************************************************************* */
@@ -105,20 +116,7 @@ public:
      *         elements are equal; false otherwise.
      */
     bool operator==(const Matrix<T>& rhs) const {
-        // Check if the dimensions are the same
-        if (this->getRows() != rhs.getRows() 
-            || this->getCols() != rhs.getCols()) {
-            return false;
-        }
-        // Compare each element in the matrices
-        for (int i = 0; i < this->getRows(); ++i) {
-            for (int j = 0; j < this->getCols(); ++j) {
-                if ((*this)(i, j) != rhs(i, j)) {
-                    return false;
-                }
-            }
-        }
-        return true;
+        return rows == rhs.rows && cols == rhs.cols && data == rhs.data;
     }
 
     /* ********************************************************************* */
@@ -133,20 +131,16 @@ public:
      */
     Matrix<T> operator*(const Matrix<T>& other) const {
         // Validate matrix dimensions
-        if (getCols() != other.getRows()) {
-            throw std::invalid_argument(
-                "Matrix dimensions must match for multiplication."
-            );
-        }
+        if (cols != other.rows) throw std::invalid_argument(
+            "Incompatible dimensions for multiplication."
+        );
         // Determine the number of rows and columns for the resulting matrix
         int blockSize = 128;
-        const int rows = getRows();
-        const int otherCols = other.getCols();
-        Matrix<T> result(rows, otherCols);
+        Matrix<T> result(rows, other.cols);
         std::vector<std::thread> threads;
         // Launch threads for each block of the resulting matrix
         for (int i = 0; i < rows; i += blockSize) {
-            for (int j = 0; j < otherCols; j += blockSize) {
+            for (int j = 0; j < other.cols; j += blockSize) {
                 threads.emplace_back(
                     &Matrix::multiplyBlock, 
                     this, i, j, blockSize, 
@@ -170,8 +164,6 @@ public:
     Matrix<T> transpose() const {
         // Determine the number of rows and columns for the resulting matrix
         int blockSize = 256;
-        const int rows = getRows();
-        const int cols = getCols();
         Matrix<T> result(cols, rows);
         std::vector<std::thread> threads;
         // Loop over the matrix in blocks
@@ -184,8 +176,8 @@ public:
             }
         }
         // Wait for all threads to complete their tasks
-        for (auto& th : threads) {
-            th.join();
+        for (auto& thread : threads) {
+            thread.join();
         }
         return result;
     }
@@ -209,12 +201,12 @@ public:
         int rowStart, int colStart, int blockSize, 
         const Matrix<T>& other, Matrix<T>& result
     ) const {
-        int endRow = std::min(rowStart + blockSize, getRows());
+        int endRow = std::min(rowStart + blockSize, rows);
         int endCol = std::min(colStart + blockSize, other.getCols());
         for (int i = rowStart; i < endRow; ++i) {
             for (int j = colStart; j < endCol; ++j) {
                 T sum = 0;
-                for (int k = 0; k < getCols(); ++k) {
+                for (int k = 0; k < cols; ++k) {
                     sum += (*this)(i, k) * other(k, j);
                 }
                 result(i, j) = sum;
@@ -237,8 +229,8 @@ public:
         int blockSize, 
         Matrix<T>& result
     ) const {
-        for (int i = row; i < std::min(row + blockSize, getRows()); ++i) {
-            for (int j = col; j < std::min(col + blockSize, getCols()); ++j) {
+        for (int i = row; i < std::min(row + blockSize, rows); ++i) {
+            for (int j = col; j < std::min(col + blockSize, cols); ++j) {
                 result(j, i) = (*this)(i, j);
             }
         }
@@ -252,9 +244,9 @@ public:
      * Prints the matrix to standard output.
      */
     void print() const {
-        for (const auto& row : data) {
-            for (const auto& elem : row) {
-                std::cout << elem << " ";
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < cols; ++j) {
+                std::cout << (*this)(i, j) << " ";
             }
             std::cout << std::endl;
         }

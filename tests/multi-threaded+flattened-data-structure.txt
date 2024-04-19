@@ -1,0 +1,13 @@
+Testing Matrix Multiplication...
+Multiplication tests completed successfully.
+
+Testing Matrix Transposition...
+Transposition tests completed successfully.
+
+Testing Matrix Performance...
+Multiplication of 1000x1000 matrix took 2770.97 milliseconds.
+Transposition of 1000x1000 matrix took 20.5715 milliseconds.
+
+All tests passed!
+
+./matrix_test  27.48s user 0.11s system 966% cpu 2.853 total
