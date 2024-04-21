@@ -3,7 +3,13 @@
 
 #include <vector>
 #include <thread>
+#include <string>
+
+#include <sstream>
 #include <iostream>
+
+#include <iomanip>
+#include <numeric>
 
 /**
  * Matrix Library
@@ -43,9 +49,8 @@ public:
      * @param init A nested initializer list representing a matrix.
      */
     Matrix(std::initializer_list<std::initializer_list<T>> init) : 
-        rows(static_cast<int>(init.size())), 
-        cols(init.begin() != init.end() 
-            ? static_cast<int>(init.begin()->size()) : 0),
+        rows(init.size()), 
+        cols(init.begin()->size()),
         data(rows * cols) {
         auto it = data.begin();
         for (const auto& row : init) {
@@ -60,6 +65,28 @@ public:
 
     /* ********************************************************************* */
     /* ***************************** Accessors ***************************** */
+    /* ********************************************************************* */
+
+    /**
+     * Returns the number of rows in the matrix.
+     * 
+     * @return Integer count of rows.
+     */
+    int getRows() const { 
+        return rows; 
+    }
+
+    /**
+     * Returns the number of columns in the matrix.
+     * 
+     * @return Integer count of columns.
+     */
+    int getCols() const { 
+        return cols; 
+    }
+
+    /* ********************************************************************* */
+    /* ************************ Operator Overloads ************************* */
     /* ********************************************************************* */
 
     /**
@@ -84,30 +111,8 @@ public:
      */
     const T& operator()(int row, int col) const {
         return data[row * cols + col];
-    }
+    }    
 
-    /**
-     * Returns the number of rows in the matrix.
-     * 
-     * @return Integer count of rows.
-     */
-    int getRows() const { 
-        return rows; 
-    }
-
-    /**
-     * Returns the number of columns in the matrix.
-     * 
-     * @return Integer count of columns.
-     */
-    int getCols() const { 
-        return cols; 
-    }
-
-    /* ********************************************************************* */
-    /* ************************ Operator Overloads ************************* */
-    /* ********************************************************************* */
-    
     /**
      * Compares two matrices for equality.
      * 
@@ -117,6 +122,17 @@ public:
      */
     bool operator==(const Matrix<T>& rhs) const {
         return rows == rhs.rows && cols == rhs.cols && data == rhs.data;
+    }
+
+    /**
+     * Compares two matrices for inequality.
+     * 
+     * @param rhs The right-hand side matrix to compare with this matrix.
+     * @return true if the matrices are not the same size or if any 
+     *         corresponding elements are different; false otherwise.
+     */
+    bool operator!=(const Matrix<T>& rhs) const {
+        return !(*this == rhs);
     }
 
     /* ********************************************************************* */
@@ -150,40 +166,10 @@ public:
             }
         }
         // Wait for all threads to complete
-        for (auto& thread : threads) {
+        for (auto& thread : threads)
             thread.join();
-        }
         return result;
     }
-    
-    /**
-     * Transposes the matrix.
-     * 
-     * @return A new matrix that is the transpose of this matrix.
-     */
-    Matrix<T> transpose() const {
-        Matrix<T> result(cols, rows);
-        // Loop over the matrix in blocks
-        int blockSize = 256;
-        std::vector<std::thread> threads;
-        for (int i = 0; i < rows; i += blockSize) {
-            for (int j = 0; j < cols; j += blockSize) {
-                // Launch a new thread for each block
-                threads.emplace_back([=, &result]() {
-                    transposeBlock(i, j, blockSize, result);
-                });
-            }
-        }
-        // Wait for all threads to complete their tasks
-        for (auto& thread : threads) {
-            thread.join();
-        }
-        return result;
-    }
-
-    /* ********************************************************************* */
-    /* ************************** Helper Functions ************************* */
-    /* ********************************************************************* */
 
     /**
      * Helper function to multiply a block of the matrix.
@@ -205,12 +191,35 @@ public:
         for (int i = rowStart; i < endRow; ++i) {
             for (int j = colStart; j < endCol; ++j) {
                 T sum = 0;
-                for (int k = 0; k < cols; ++k) {
+                for (int k = 0; k < cols; ++k)
                     sum += (*this)(i, k) * other(k, j);
-                }
                 result(i, j) = sum;
             }
         }
+    }
+    
+    /**
+     * Transposes the matrix.
+     * 
+     * @return A new matrix that is the transpose of this matrix.
+     */
+    Matrix<T> transpose() const {
+        Matrix<T> result(cols, rows);
+        // Loop over the matrix in blocks
+        int blockSize = 256;
+        std::vector<std::thread> threads;
+        for (int i = 0; i < rows; i += blockSize) {
+            for (int j = 0; j < cols; j += blockSize) {
+                // Launch a new thread for each block
+                threads.emplace_back([=, &result]() {
+                    transposeBlock(i, j, blockSize, result);
+                });
+            }
+        }
+        // Wait for all threads to complete their tasks
+        for (auto& thread : threads)
+            thread.join();
+        return result;
     }
 
     /**
@@ -228,11 +237,52 @@ public:
         int blockSize, 
         Matrix<T>& result
     ) const {
-        for (int i = row; i < std::min(row + blockSize, rows); ++i) {
-            for (int j = col; j < std::min(col + blockSize, cols); ++j) {
+        int blockRowEnd = std::min(row + blockSize, rows);
+        int blockColEnd = std::min(col + blockSize, cols);
+        for (int i = row; i < blockRowEnd; ++i) {
+            for (int j = col; j < blockColEnd; ++j) {
                 result(j, i) = (*this)(i, j);
             }
         }
+    }
+
+    /* ********************************************************************* */
+    /* ************************** Helper Functions ************************* */
+    /* ********************************************************************* */
+
+    /**
+     * Counts the number of digits in a given integer.
+     * 
+     * @param n The integer whose digits are to be counted.
+     * @return The number of digits in the integer.
+     */
+    int countDigits(int n) const {
+        n = std::abs(n);
+        if (n == 0) return 1;
+        int digits = 0;
+        while (n != 0) {
+            n /= 10;
+            digits++;
+        }
+        return digits;
+    }
+
+    /**
+     * Calculates the maximum width required for each matrix column.
+     * 
+     * @return A vector containing the maximum width for each column.
+     */
+    std::vector<int> getColumnWidths() const {
+        std::vector<int> columnWidths(cols, 0);
+        for (int j = 0; j < cols; ++j) {
+            for (int i = 0; i < rows; ++i) {
+                int element = (*this)(i, j);
+                int width = countDigits(element);
+                if (element < 0) width++; // Account for negative sign
+                columnWidths[j] = std::max(columnWidths[j], width);
+            }
+        }
+        return columnWidths;
     }
 
     /* ********************************************************************* */
@@ -241,14 +291,34 @@ public:
 
     /**
      * Prints the matrix to standard output.
+     * 
+     * @param indent Number of spaces to indent before printing the matrix.
+     * @param color The color code to apply to the matrix.
      */
-    void print() const {
+    void print(int indent = 0, const std::string& color = "") const {
+        std::ostringstream stream;
+        // Add indentation to the beginning of each line
+        std::string padding(indent, ' ');
+        // Calculate the maximum width required for each column
+        std::vector<int> columnWidths = getColumnWidths();
+        // Generate string representation of matrix
+        int totalWidth = std::accumulate(
+            columnWidths.begin(), 
+            columnWidths.end(), 0
+        ) + cols;
+        const std::string resetColorCode = "\033[0m";
+        stream << color << padding << "┌" << std::string(totalWidth + 1, ' ') 
+               << "┐\n" << resetColorCode;
         for (int i = 0; i < rows; ++i) {
-            for (int j = 0; j < cols; ++j) {
-                std::cout << (*this)(i, j) << " ";
-            }
-            std::cout << std::endl;
+            stream << color << padding << "|";
+            for (int j = 0; j < cols; ++j)
+                stream << " " << std::setw(columnWidths[j]) << (*this)(i, j);
+            stream << " |\n" << resetColorCode;
         }
+        stream << color << padding << "└" << std::string(totalWidth + 1, ' ') 
+               << "┘\n" << resetColorCode;
+        // Print string representation of matrix
+        std::cout << stream.str();
     }
 };
 

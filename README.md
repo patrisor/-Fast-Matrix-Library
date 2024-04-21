@@ -27,4 +27,4 @@ Run the executable after building:
 - Extend the library to include more complex algebraic operations.
 
 ## Features
-- High Performance: Uses a flat data structure and multithreading to optimize calculations.
+- High Performance: Uses multithreading to optimize computations.
