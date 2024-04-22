@@ -2,14 +2,14 @@
 #define MATRIXLIB_H
 
 #include <vector>
-#include <thread>
 #include <string>
-
-#include <sstream>
-#include <iostream>
+#include <future>
 
 #include <iomanip>
 #include <numeric>
+
+#include <sstream>
+#include <iostream>
 
 /**
  * Matrix Library
@@ -152,50 +152,24 @@ public:
         );
         // Determine the number of rows and columns for the resulting matrix
         Matrix<T> result(rows, other.cols);
-        // Launch threads for each block of the resulting matrix
+        // Launch asynchronous tasks for each block of the resulting matrix
         int blockSize = 128;
-        std::vector<std::thread> threads;
+        std::vector<std::future<void>> futures;
         for (int i = 0; i < rows; i += blockSize) {
             for (int j = 0; j < other.cols; j += blockSize) {
-                threads.emplace_back(
-                    &Matrix::multiplyBlock, 
-                    this, i, j, blockSize, 
-                    std::cref(other), 
+                futures.push_back(std::async(
+                    std::launch::async,
+                    &Matrix::multiplyBlock,
+                    this, i, j, blockSize,
+                    std::cref(other),
                     std::ref(result)
-                );
+                ));
             }
         }
-        // Wait for all threads to complete
-        for (auto& thread : threads)
-            thread.join();
+        // Wait for all asynchronous tasks to complete
+        for (auto& future : futures)
+            future.get();
         return result;
-    }
-
-    /**
-     * Helper function to multiply a block of the matrix.
-     * Used in multithreaded multiplication algorithm.
-     * 
-     * @param rowStart The starting row index for the block.
-     * @param colStart The starting column index for the block.
-     * @param blockSize The size of the block to process.
-     * @param other The matrix to multiply with.
-     * @param result Reference to the resulting matrix where the block's 
-     *               results are stored.
-     */
-    void multiplyBlock(
-        int rowStart, int colStart, int blockSize, 
-        const Matrix<T>& other, Matrix<T>& result
-    ) const {
-        int endRow = std::min(rowStart + blockSize, rows);
-        int endCol = std::min(colStart + blockSize, other.getCols());
-        for (int i = rowStart; i < endRow; ++i) {
-            for (int j = colStart; j < endCol; ++j) {
-                T sum = 0;
-                for (int k = 0; k < cols; ++k)
-                    sum += (*this)(i, k) * other(k, j);
-                result(i, j) = sum;
-            }
-        }
     }
     
     /**
@@ -207,45 +181,60 @@ public:
         Matrix<T> result(cols, rows);
         // Loop over the matrix in blocks
         int blockSize = 256;
-        std::vector<std::thread> threads;
+        std::vector<std::future<void>> futures;
         for (int i = 0; i < rows; i += blockSize) {
             for (int j = 0; j < cols; j += blockSize) {
-                // Launch a new thread for each block
-                threads.emplace_back([=, &result]() {
-                    transposeBlock(i, j, blockSize, result);
-                });
+                futures.push_back(std::async(
+                    std::launch::async,
+                    [=, &result]() {
+                        transposeBlock(i, j, blockSize, result);
+                    }
+                ));
             }
         }
-        // Wait for all threads to complete their tasks
-        for (auto& thread : threads)
-            thread.join();
+        // Wait for all asynchronous tasks to complete
+        for (auto& future : futures)
+            future.get();
         return result;
     }
 
+    /* ********************************************************************* */
+    /* *************************** Visualization *************************** */
+    /* ********************************************************************* */
+
     /**
-     * Helper function to transpose a block of the matrix. 
-     * Used in multithreaded transposition algorithm.
+     * Prints the matrix to standard output.
      * 
-     * @param src The source matrix to transpose from.
-     * @param dst The destination matrix to transpose into.
-     * @param row Starting row index for the block.
-     * @param col Starting column index for the block.
-     * @param blockSize Size of the block to transpose.
+     * @param indent Number of spaces to indent before printing the matrix.
+     * @param color The color code to apply to the matrix.
      */
-    void transposeBlock(
-        int row, int col, 
-        int blockSize, 
-        Matrix<T>& result
-    ) const {
-        int blockRowEnd = std::min(row + blockSize, rows);
-        int blockColEnd = std::min(col + blockSize, cols);
-        for (int i = row; i < blockRowEnd; ++i) {
-            for (int j = col; j < blockColEnd; ++j) {
-                result(j, i) = (*this)(i, j);
-            }
+    void print(int indent = 0, const std::string& color = "\033[0m") const {
+        std::ostringstream stream;
+        // Add indentation to the beginning of each line
+        std::string padding(indent, ' ');
+        // Calculate the maximum width required for each column
+        std::vector<int> columnWidths = getColumnWidths();
+        // Generate string representation of matrix
+        int totalWidth = std::accumulate(
+            columnWidths.begin(), 
+            columnWidths.end(), 0
+        ) + cols;
+        const std::string resetColorCode = "\033[0m";
+        stream << color << padding << "┌" << std::string(totalWidth + 1, ' ') 
+               << "┐\n" << resetColorCode;
+        for (int i = 0; i < rows; ++i) {
+            stream << color << padding << "|";
+            for (int j = 0; j < cols; ++j)
+                stream << " " << std::setw(columnWidths[j]) << (*this)(i, j);
+            stream << " |\n" << resetColorCode;
         }
+        stream << color << padding << "└" << std::string(totalWidth + 1, ' ') 
+               << "┘\n" << resetColorCode;
+        // Print string representation of matrix
+        std::cout << stream.str();
     }
 
+private:
     /* ********************************************************************* */
     /* ************************** Helper Functions ************************* */
     /* ********************************************************************* */
@@ -285,40 +274,55 @@ public:
         return columnWidths;
     }
 
-    /* ********************************************************************* */
-    /* *************************** Visualization *************************** */
-    /* ********************************************************************* */
+    /**
+     * Helper function to multiply a block of the matrix.
+     * Used in multithreaded multiplication algorithm.
+     * 
+     * @param rowStart The starting row index for the block.
+     * @param colStart The starting column index for the block.
+     * @param blockSize The size of the block to process.
+     * @param other The matrix to multiply with.
+     * @param result Reference to the resulting matrix where the block's 
+     *               results are stored.
+     */
+    void multiplyBlock(
+        int rowStart, int colStart, int blockSize, 
+        const Matrix<T>& other, Matrix<T>& result
+    ) const {
+        int endRow = std::min(rowStart + blockSize, rows);
+        int endCol = std::min(colStart + blockSize, other.getCols());
+        for (int i = rowStart; i < endRow; ++i) {
+            for (int j = colStart; j < endCol; ++j) {
+                T sum = 0;
+                for (int k = 0; k < cols; ++k)
+                    sum += (*this)(i, k) * other(k, j);
+                result(i, j) = sum;
+            }
+        }
+    }
 
     /**
-     * Prints the matrix to standard output.
+     * Helper function to transpose a block of the matrix. 
+     * Used in multithreaded transposition algorithm.
      * 
-     * @param indent Number of spaces to indent before printing the matrix.
-     * @param color The color code to apply to the matrix.
+     * @param src The source matrix to transpose from.
+     * @param dst The destination matrix to transpose into.
+     * @param row Starting row index for the block.
+     * @param col Starting column index for the block.
+     * @param blockSize Size of the block to transpose.
      */
-    void print(int indent = 0, const std::string& color = "") const {
-        std::ostringstream stream;
-        // Add indentation to the beginning of each line
-        std::string padding(indent, ' ');
-        // Calculate the maximum width required for each column
-        std::vector<int> columnWidths = getColumnWidths();
-        // Generate string representation of matrix
-        int totalWidth = std::accumulate(
-            columnWidths.begin(), 
-            columnWidths.end(), 0
-        ) + cols;
-        const std::string resetColorCode = "\033[0m";
-        stream << color << padding << "┌" << std::string(totalWidth + 1, ' ') 
-               << "┐\n" << resetColorCode;
-        for (int i = 0; i < rows; ++i) {
-            stream << color << padding << "|";
-            for (int j = 0; j < cols; ++j)
-                stream << " " << std::setw(columnWidths[j]) << (*this)(i, j);
-            stream << " |\n" << resetColorCode;
+    void transposeBlock(
+        int row, int col, 
+        int blockSize, 
+        Matrix<T>& result
+    ) const {
+        int blockRowEnd = std::min(row + blockSize, rows);
+        int blockColEnd = std::min(col + blockSize, cols);
+        for (int i = row; i < blockRowEnd; ++i) {
+            for (int j = col; j < blockColEnd; ++j) {
+                result(j, i) = (*this)(i, j);
+            }
         }
-        stream << color << padding << "└" << std::string(totalWidth + 1, ' ') 
-               << "┘\n" << resetColorCode;
-        // Print string representation of matrix
-        std::cout << stream.str();
     }
 };
 

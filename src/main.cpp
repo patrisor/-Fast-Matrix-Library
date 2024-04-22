@@ -222,17 +222,13 @@ void testKnownResultMultiplication() {
  * Runs all the tests for matrix multiplication.
  */
 void testMatrixMultiplication() {
-    std::cout << BOLD << "Testing Matrix Multiplication:" << RESET << "\n\n";
+    std::cout << BOLD << "Testing Matrix Multiplication:" << RESET << "\n";
     testIdentityMatrixMultiplication();
-    std::cout << "\n";
     testZeroMatrixMultiplication();
-    std::cout << "\n";
     testRectangularMatrixMultiplication();
-    std::cout << "\n";
     testSymmetricResult();
-    std::cout << "\n";
     testKnownResultMultiplication();
-    std::cout << "\n\t• " << GREEN + BOLD
+    std::cout << "\t• " << GREEN + BOLD
               << "Multiplication Tests completed successfully!" 
               << RESET << "\n";
 }
@@ -458,20 +454,118 @@ void testZeroMatrixTransposition() {
  * Run all the matrix transposition tests.
  */
 void testMatrixTransposition() {
-    std::cout << BOLD << "Testing Matrix Transposition:" << RESET << "\n\n";
+    std::cout << BOLD << "Testing Matrix Transposition:" << RESET << "\n";
     testSquareMatrixTransposition();
-    std::cout << "\n";
     testRectangularMatrixTransposition();
-    std::cout << "\n";
     testSingleRowTransposition();
-    std::cout << "\n";
     testSingleColumnTransposition();
-    std::cout << "\n";
     testIdentityMatrixTransposition();
-    std::cout << "\n";
     testZeroMatrixTransposition();
-    std::cout << "\n\t• " << GREEN + BOLD
+    std::cout << "\t• " << GREEN + BOLD
               << "Transposition Tests completed successfully!" 
+              << RESET << "\n";
+}
+
+/* ********************************************************************* */
+/* ********************** Matrix Edge Case Tests *********************** */
+/* ********************************************************************* */
+
+/**
+ * Test operations on an empty matrix.
+ */
+void testEmptyMatrix() {
+    std::cout << BOLD << "\t• Empty Matrix Test:" << RESET 
+              << " Ensure operations on an empty matrix"
+              << " doesn't cause crashes\n";
+    // Create empty matrices
+    Matrix<int> empty(0, 0);
+    Matrix<int> anotherEmpty(0, 0);
+    // Print matrices
+    std::cout << BOLD << "\t\t‣ Empty Matrix:" << RESET << "\n";
+    empty.print(18);
+    // Test transpose operation on empty matrix
+    try {
+        Matrix<int> transposed = empty.transpose();
+        std::cout << "\t\t‣ " << GREEN + BOLD << "Test Passed" << RESET + GREEN
+                  << ": No crash on transpose" << RESET << "\n";
+    } catch (const std::exception& e) {
+        std::cout << "\t\t‣ " << RED + BOLD << "Test Failed" << RESET + RED
+                  << ": Exception on transpose - " << e.what() 
+                  << RESET << "\n";
+        std::exit(EXIT_FAILURE);
+    }
+    // Test multiplication operation on empty matrices
+    try {
+        Matrix<int> product = empty * anotherEmpty;
+        std::cout << "\t\t‣ " << GREEN + BOLD << "Test Passed" << RESET + GREEN
+                  << ": No crash on multiplication" << RESET << "\n";
+    } catch (const std::exception& e) {
+        std::cout << "\t\t‣ " << RED + BOLD << "Test Failed" << RESET + RED
+                  << ": Exception on multiplication - " << e.what() 
+                  << RESET << "\n";
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+/**
+ * Test invalid matrix multiplication.
+ */
+void testInvalidMatrixMultiplication() {
+    std::cout << BOLD << "\t• Invalid Multiplication Test:" << RESET 
+              << " Ensure invalid multiplication (A * B)"
+              << " throws an exception\n";
+    // Define matrices with incompatible dimensions
+    Matrix<int> A = {{1, 2, 3}};
+    Matrix<int> B = {{1, 2}};
+    // Print matrices
+    std::cout << BOLD << "\t\t‣ Matrix A:" << RESET << "\n";
+    A.print(18);
+    std::cout << BOLD << "\t\t‣ Matrix B:" << RESET << "\n";
+    B.print(18);
+    // Attempt invalid multiplication
+    try { // This should throw an exception
+        Matrix<int> result = A * B;
+        std::cout << "\t\t‣ " << RED + BOLD << "Test Failed" << RESET + RED
+                  << ": No exception on invalid multiplication" 
+                  << RESET << "\n";
+        std::exit(EXIT_FAILURE);
+    } catch (const std::invalid_argument& e) {
+        std::cout << "\t\t‣ " << GREEN + BOLD << "Test Passed" << RESET + GREEN
+                  << ": Exception thrown on invalid multiplication" 
+                  << RESET << "\n";
+    }
+}
+
+/**
+ * Test invalid matrix transposition.
+ */
+void testInvalidMatrixTransposition() {
+    std::cout << BOLD << "\t• Invalid Transposition Test:" << RESET 
+              << " Ensure invalid transposition does not cause crashes\n";
+    try { // This should throw an exception
+        // Define a non-rectangular matrix using nested initializer lists
+        Matrix<int> invalidMatrix = {{1, 2, 3}, {4, 5}};
+        std::cout << "\t\t‣ " << RED + BOLD << "Test Failed" << RESET + RED
+                  << ": No exception on invalid transposition" 
+                  << RESET << "\n";
+        std::exit(EXIT_FAILURE);
+    } catch (const std::invalid_argument& e) {
+        std::cout << "\t\t‣ " << GREEN + BOLD << "Test Passed" << RESET + GREEN
+                  << ": Exception thrown on invalid transposition - " 
+                  << e.what() << RESET << "\n";
+    }
+}
+
+/**
+ * Run all the matrix edge case tests.
+ */
+void testMatrixEdgeCases() {
+    std::cout << BOLD << "Testing Matrix Edge Cases:" << RESET << "\n";
+    testEmptyMatrix();
+    testInvalidMatrixMultiplication();
+    testInvalidMatrixTransposition();
+    std::cout << "\t• " << GREEN + BOLD
+              << "Matrix Edge Case Tests completed successfully!" 
               << RESET << "\n";
 }
 
@@ -506,6 +600,9 @@ void testMatrixPerformance() {
 }
 
 int main() {
+    // Run Matrix Edge Case tests
+    testMatrixEdgeCases();
+    std::cout << "\n";
     // Run Matrix Multiplication tests
     testMatrixMultiplication();
     std::cout << "\n";
